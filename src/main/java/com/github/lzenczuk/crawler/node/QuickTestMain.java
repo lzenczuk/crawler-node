@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * @author lzenczuk 05/04/2016
  */
 public class QuickTestMain {
-    public static void main(String[] args) throws InterruptedException {
+    /*public static void main(String[] args) throws InterruptedException {
         final UrlRequestServiceImpl requestService = new UrlRequestServiceImpl(new HttpClientPoolImpl(5), new StorageFactory());
 
         String baseUrl="http://forsal.pl/artykuly/";
@@ -34,5 +34,5 @@ public class QuickTestMain {
         countDownLatch.await(20000L, TimeUnit.MILLISECONDS);
 
         System.out.println("Finished");
-    }
+    }*/
 }
