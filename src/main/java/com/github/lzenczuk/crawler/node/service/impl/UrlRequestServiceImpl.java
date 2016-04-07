@@ -1,6 +1,7 @@
 package com.github.lzenczuk.crawler.node.service.impl;
 
-import com.github.lzenczuk.crawler.node.http.HttpClientPool;
+import com.github.lzenczuk.crawler.node.http.HttpClient;
+import com.github.lzenczuk.crawler.node.http.HttpClientNoResourcesException;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlRequestDTO;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlResponseDTO;
 import com.github.lzenczuk.crawler.node.http.model.HttpResponse;
@@ -13,58 +14,48 @@ import com.github.lzenczuk.crawler.node.storage.StorageType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author lzenczuk 04/04/2016
  */
 public class UrlRequestServiceImpl implements UrlRequestService {
 
-    private HttpClientPool httpClientPool;
-    private StorageFactory storageFactory;
+    private final HttpClient httpClient;
+    private final StorageFactory storageFactory;
 
-    public UrlRequestServiceImpl(HttpClientPool httpClientPool, StorageFactory storageFactory) {
-        this.httpClientPool = httpClientPool;
+
+    public UrlRequestServiceImpl(HttpClient httpClient, StorageFactory storageFactory) {
+        this.httpClient = httpClient;
         this.storageFactory = storageFactory;
     }
 
     @Override
-    public UrlResponseDTO process(UrlRequestDTO urlRequestDTO) {
+    public CompletableFuture<UrlResponseDTO> process(UrlRequestDTO urlRequestDTO) {
 
         final Optional<UrlResponseDTO> optionalValidationErrorResponse = validateParams(urlRequestDTO);
         if(optionalValidationErrorResponse.isPresent()){
-            return optionalValidationErrorResponse.get();
+            return CompletableFuture.completedFuture(optionalValidationErrorResponse.get());
         }
-
-        HttpResponse httpResponse = null;
 
         try {
-            httpResponse = httpClientPool.getClient().getUri(new URI(urlRequestDTO.getAddress()));
+            return httpClient.getUri(new URI(urlRequestDTO.getAddress())).thenApply(httpResponse -> {
+                final Storage storage;
 
-            final Storage storage = storageFactory.getStore(StorageType.valueOf(urlRequestDTO.getStoreType()), urlRequestDTO.getStoreParams());
+                try {
+                    storage = storageFactory.getStore(StorageType.valueOf(urlRequestDTO.getStoreType()), urlRequestDTO.getStoreParams());
+                    httpResponse.getEntityStream().ifPresent(storage::putObject);
+                } catch (StorageCreationException e) {
+                    return new UrlResponseDTO(e.getMessage());
+                }
 
-            httpResponse.getEntityStream().ifPresent(storage::putObject);
-
-            return new UrlResponseDTO(httpResponse.getStatusCode(), httpResponse.getProtocolVersion(), httpResponse.getReasonPhrase());
-
-        } catch (InterruptedException e) {
-            return new UrlResponseDTO("Internal error");
+                return new UrlResponseDTO(httpResponse.getStatusCode(), httpResponse.getProtocolVersion(), httpResponse.getReasonPhrase());
+            });
         } catch (URISyntaxException e) {
-            return new UrlResponseDTO("Incorrect address format");
-        } catch (StorageCreationException e) {
-            return new UrlResponseDTO(e.getMessage());
-        } finally {
-            if(httpResponse !=null){
-                httpResponse.release();
-            }
+            return CompletableFuture.completedFuture(new UrlResponseDTO("Incorrect address format"));
+        } catch (HttpClientNoResourcesException e) {
+            return CompletableFuture.completedFuture(new UrlResponseDTO("Http client doesn't have resources to process request"));
         }
-    }
-
-    public void setHttpClientPool(HttpClientPool httpClientPool) {
-        this.httpClientPool = httpClientPool;
-    }
-
-    public void setStorageFactory(StorageFactory storageFactory) {
-        this.storageFactory = storageFactory;
     }
 
     private Optional<UrlResponseDTO> validateParams(UrlRequestDTO urlRequestDTO){

@@ -14,19 +14,16 @@ public class HttpResponse {
 
     private final String errorMessage;
 
-    private final CloseableHttpResponse closeableHttpResponse;
-    private final HttpClient httpClient;
+    private final org.apache.http.HttpResponse apacheHttpResponse;
 
-    public HttpResponse(CloseableHttpResponse closeableHttpResponse, HttpClient httpClient) {
+    public HttpResponse(org.apache.http.HttpResponse apacheHttpResponse) {
         this.errorMessage = null;
-        this.closeableHttpResponse = closeableHttpResponse;
-        this.httpClient = httpClient;
+        this.apacheHttpResponse = apacheHttpResponse;
     }
 
     public HttpResponse(String errorMessage) {
         this.errorMessage = errorMessage;
-        this.closeableHttpResponse = null;
-        this.httpClient = null;
+        this.apacheHttpResponse = null;
     }
 
     public boolean isError(){
@@ -37,33 +34,25 @@ public class HttpResponse {
         return errorMessage;
     }
 
-    public void release(){
-        try {
-            if(closeableHttpResponse!=null) closeableHttpResponse.close();
-            if(httpClient !=null) httpClient.release();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     public Integer getStatusCode() {
-        return closeableHttpResponse.getStatusLine().getStatusCode();
+        return apacheHttpResponse.getStatusLine().getStatusCode();
     }
 
     public String getProtocolVersion() {
-        return closeableHttpResponse.getProtocolVersion().toString();
+        return apacheHttpResponse.getProtocolVersion().toString();
     }
 
     public String getReasonPhrase() {
-        return closeableHttpResponse.getStatusLine().getReasonPhrase();
+        return apacheHttpResponse.getStatusLine().getReasonPhrase();
     }
 
     public Optional<InputStream> getEntityStream(){
 
-        if(closeableHttpResponse==null || closeableHttpResponse.getEntity()==null) return Optional.empty();
+        if(apacheHttpResponse ==null || apacheHttpResponse.getEntity()==null) return Optional.empty();
 
         try {
-            return Optional.of(closeableHttpResponse.getEntity().getContent());
+            return Optional.of(apacheHttpResponse.getEntity().getContent());
         } catch (IOException e) {
             return Optional.empty();
         }

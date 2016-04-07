@@ -1,7 +1,7 @@
 package com.github.lzenczuk.crawler.node.config;
 
-import com.github.lzenczuk.crawler.node.http.HttpClientPool;
-import com.github.lzenczuk.crawler.node.http.impl.HttpClientPoolImpl;
+import com.github.lzenczuk.crawler.node.http.HttpClient;
+import com.github.lzenczuk.crawler.node.http.impl.HttpClientImpl;
 import com.github.lzenczuk.crawler.node.service.UrlRequestService;
 import com.github.lzenczuk.crawler.node.service.impl.UrlRequestServiceImpl;
 import com.github.lzenczuk.crawler.node.storage.StorageFactory;
@@ -15,11 +15,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MainConfirugation {
 
-    public static final int POOL_SIZE = 10;
-
     @Bean
-    public HttpClientPool clientPool(){
-        return new HttpClientPoolImpl(POOL_SIZE);
+    public HttpClient httpClient(){
+        return new HttpClientImpl();
     }
 
     @Bean
@@ -28,8 +26,8 @@ public class MainConfirugation {
     }
 
     @Bean
-    public UrlRequestService requestService(HttpClientPool httpClientPool, StorageFactory storageFactory){
-        return new UrlRequestServiceImpl(httpClientPool, storageFactory);
+    public UrlRequestService requestService(HttpClient httpClient, StorageFactory storageFactory){
+        return new UrlRequestServiceImpl(httpClient, storageFactory);
     }
 
 }
