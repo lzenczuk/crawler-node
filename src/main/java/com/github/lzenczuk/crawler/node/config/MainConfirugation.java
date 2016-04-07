@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 public class MainConfirugation {
 
     @Bean
-    public HttpClient httpClient(){
+    public HttpClient httpClient() throws InterruptedException {
         return new HttpClientImpl();
     }
 

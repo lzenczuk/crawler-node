@@ -1,75 +1,64 @@
 package com.github.lzenczuk.crawler.node.http.impl;
 
 import com.github.lzenczuk.crawler.node.http.HttpClient;
-import com.github.lzenczuk.crawler.node.http.HttpClientNoResourcesException;
 import com.github.lzenczuk.crawler.node.http.model.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author lzenczuk 04/04/2016
  */
 public class HttpClientImpl implements HttpClient {
 
-    public static final int DEFAULT_MAX_ACTIVE_REQUEST = 5;
+    final static Logger logger = LoggerFactory.getLogger(HttpClientImpl.class);
 
-    private final ReadWriteLock activeRequestsCountLock = new ReentrantReadWriteLock();
+    public static final int MAX_ACTIVE_REQUEST = 1000;
+    public static final int DEFAULT_ACTIVE_REQUEST = 10;
 
     private final CloseableHttpAsyncClient httpAsyncClient;
-    private final AtomicInteger activeRequestsCounter;
-    private final int maxActiveRequests;
 
-    public HttpClientImpl() {
+    private final BlockingQueue<Integer> requestQueue = new ArrayBlockingQueue<Integer>(MAX_ACTIVE_REQUEST);
+
+    private final AtomicInteger numberOfActiveRequests = new AtomicInteger();
+    private final AtomicInteger expectedNumberOfActiveRequests = new AtomicInteger();
+    private final AtomicInteger activeRequestIdGenerator = new AtomicInteger();
+
+    public HttpClientImpl() throws InterruptedException {
         httpAsyncClient = HttpAsyncClients.createDefault();
         httpAsyncClient.start();
 
-        maxActiveRequests = DEFAULT_MAX_ACTIVE_REQUEST;
-        activeRequestsCounter = new AtomicInteger(maxActiveRequests);
+        updateNumberOfActiveRequests(DEFAULT_ACTIVE_REQUEST);
     }
 
-    public HttpClientImpl(CloseableHttpAsyncClient httpAsyncClient) {
-        this.httpAsyncClient = httpAsyncClient;
-        if(!httpAsyncClient.isRunning()){
-            httpAsyncClient.start();
-        }
 
-        maxActiveRequests = 5;
-        activeRequestsCounter = new AtomicInteger(maxActiveRequests);
-    }
-
-    public HttpClientImpl(int maxActiveRequests) {
+    public HttpClientImpl(int activeRequests) throws InterruptedException {
         httpAsyncClient = HttpAsyncClients.createDefault();
         httpAsyncClient.start();
 
-        this.maxActiveRequests = maxActiveRequests;
-        activeRequestsCounter = new AtomicInteger(maxActiveRequests);
-    }
-
-    public HttpClientImpl(CloseableHttpAsyncClient httpAsyncClient, int maxActiveRequests) {
-        this.httpAsyncClient = httpAsyncClient;
-        if(!httpAsyncClient.isRunning()){
-            httpAsyncClient.start();
-        }
-
-        this.maxActiveRequests = maxActiveRequests;
-        activeRequestsCounter = new AtomicInteger(maxActiveRequests);
+        updateNumberOfActiveRequests(activeRequests);
     }
 
     @Override
-    public CompletableFuture<HttpResponse> getUri(URI uri) throws HttpClientNoResourcesException {
+    public CompletableFuture<HttpResponse> getUri(URI uri){
 
-        blockActiveRequest();
+        Integer requestId;
+
+        try {
+            requestId = blockActiveRequest();
+        } catch (InterruptedException ex) {
+            return CompletableFuture.completedFuture(new HttpResponse(ex.getMessage()));
+        }
 
         RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectionRequestTimeout(2000)
@@ -84,54 +73,79 @@ public class HttpClientImpl implements HttpClient {
             @Override
             public void completed(org.apache.http.HttpResponse result) {
                 completableFuture.complete(new HttpResponse(result));
-                releaseActiveRequest();
+                releaseActiveRequest(requestId);
             }
 
             @Override
             public void failed(Exception ex) {
                 completableFuture.complete(new HttpResponse(ex.getMessage()));
-                releaseActiveRequest();
+                releaseActiveRequest(requestId);
             }
 
             @Override
             public void cancelled() {
                 completableFuture.complete(new HttpResponse("Request cancelled"));
-                releaseActiveRequest();
-            }
-
-            private void releaseActiveRequest() {
-                activeRequestsCountLock.writeLock().lock();
-                try {
-                    activeRequestsCounter.incrementAndGet();
-                }finally {
-                    activeRequestsCountLock.writeLock().unlock();
-                }
+                releaseActiveRequest(requestId);
             }
         });
 
         return completableFuture;
     }
 
-    private void blockActiveRequest() throws HttpClientNoResourcesException {
-        activeRequestsCountLock.writeLock().lock();
-        try{
-            final int counter = activeRequestsCounter.get();
-            if(counter==0){
-                throw new HttpClientNoResourcesException();
+    private Integer blockActiveRequest() throws InterruptedException {
+        return requestQueue.take();
+    }
+
+    private void releaseActiveRequest(Integer activeRequestId) {
+        try {
+            if(decrementNumberOfActiveRequestIfNecessary()){
+                logger.info("Decrement number of active request skipping request: "+activeRequestId);
             }else{
-                activeRequestsCounter.decrementAndGet();
+                requestQueue.put(activeRequestId);
             }
-        }finally {
-            activeRequestsCountLock.writeLock().unlock();
+        } catch (InterruptedException e) {
+            logger.error("Error during releasing active request: "+activeRequestId);
         }
     }
 
-    public int getActiveRequestsCounter() {
-        activeRequestsCountLock.readLock().lock();
-        try{
-            return activeRequestsCounter.get();
-        }finally {
-            activeRequestsCountLock.readLock().unlock();
+    public int getNumberOfWaitingActiveRequests() {
+        return requestQueue.size();
+    }
+
+    public int getNumberOfActiveRequests(){
+        return numberOfActiveRequests.get();
+    }
+
+    public int getExpectedNumberOfActiveRequests(){
+        return numberOfActiveRequests.get();
+    }
+
+    public synchronized void updateNumberOfActiveRequests(int defaultActiveRequest) throws InterruptedException {
+
+        expectedNumberOfActiveRequests.set(defaultActiveRequest);
+
+        int noar = numberOfActiveRequests.get();
+        int enoar = expectedNumberOfActiveRequests.get();
+
+        if(enoar>MAX_ACTIVE_REQUEST){
+            enoar = MAX_ACTIVE_REQUEST;
         }
+
+        for(int q = noar;q<enoar;q++){
+            requestQueue.put(activeRequestIdGenerator.getAndIncrement());
+            numberOfActiveRequests.incrementAndGet();
+        }
+    }
+
+    private synchronized boolean decrementNumberOfActiveRequestIfNecessary(){
+        int noar = numberOfActiveRequests.get();
+        int enoar = expectedNumberOfActiveRequests.get();
+
+        if(enoar<noar){
+            numberOfActiveRequests.decrementAndGet();
+            return true;
+        }
+
+        return false;
     }
 }
