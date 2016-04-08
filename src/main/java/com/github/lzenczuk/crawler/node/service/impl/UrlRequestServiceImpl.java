@@ -1,10 +1,10 @@
 package com.github.lzenczuk.crawler.node.service.impl;
 
 import com.github.lzenczuk.crawler.node.http.HttpClient;
-import com.github.lzenczuk.crawler.node.http.HttpClientNoResourcesException;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlRequestDTO;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlResponseDTO;
-import com.github.lzenczuk.crawler.node.http.model.HttpResponse;
+import com.github.lzenczuk.crawler.node.model.Notification;
+import com.github.lzenczuk.crawler.node.service.NotificationService;
 import com.github.lzenczuk.crawler.node.service.UrlRequestService;
 import com.github.lzenczuk.crawler.node.storage.Storage;
 import com.github.lzenczuk.crawler.node.storage.StorageCreationException;
@@ -24,37 +24,50 @@ public class UrlRequestServiceImpl implements UrlRequestService {
     private final HttpClient httpClient;
     private final StorageFactory storageFactory;
 
+    private final NotificationService notificationService;
 
-    public UrlRequestServiceImpl(HttpClient httpClient, StorageFactory storageFactory) {
+    public UrlRequestServiceImpl(HttpClient httpClient, StorageFactory storageFactory, NotificationService notificationService) {
         this.httpClient = httpClient;
         this.storageFactory = storageFactory;
+        this.notificationService = notificationService;
     }
 
     @Override
     public CompletableFuture<UrlResponseDTO> process(UrlRequestDTO urlRequestDTO) {
 
+        notificationService.sendNotification(new Notification("Receive request: "+urlRequestDTO));
+
         final Optional<UrlResponseDTO> optionalValidationErrorResponse = validateParams(urlRequestDTO);
         if(optionalValidationErrorResponse.isPresent()){
+            notificationService.sendNotification(new Notification("Request validation error: "+optionalValidationErrorResponse.get()));
             return CompletableFuture.completedFuture(optionalValidationErrorResponse.get());
         }
 
         try {
-            return httpClient.getUri(new URI(urlRequestDTO.getAddress())).thenApply(httpResponse -> {
+            final URI uri = new URI(urlRequestDTO.getAddress());
+
+            notificationService.sendNotification(new Notification("URI: "+uri));
+
+            return httpClient.getUri(uri).thenApply(httpResponse -> {
                 final Storage storage;
+
+                notificationService.sendNotification(new Notification("Fetching URI: "+uri));
 
                 try {
                     storage = storageFactory.getStore(StorageType.valueOf(urlRequestDTO.getStoreType()), urlRequestDTO.getStoreParams());
+                    notificationService.sendNotification(new Notification("Storing entity in storage"));
                     httpResponse.getEntityStream().ifPresent(storage::putObject);
                 } catch (StorageCreationException e) {
+                    notificationService.sendNotification(new Notification("Error during storing entity"));
                     return new UrlResponseDTO(e.getMessage());
                 }
 
+                notificationService.sendNotification(new Notification("Request processed"));
                 return new UrlResponseDTO(httpResponse.getStatusCode(), httpResponse.getProtocolVersion(), httpResponse.getReasonPhrase());
             });
         } catch (URISyntaxException e) {
+            notificationService.sendNotification(new Notification("Incorrect URI"));
             return CompletableFuture.completedFuture(new UrlResponseDTO("Incorrect address format"));
-        } catch (HttpClientNoResourcesException e) {
-            return CompletableFuture.completedFuture(new UrlResponseDTO("Http client doesn't have resources to process request"));
         }
     }
 

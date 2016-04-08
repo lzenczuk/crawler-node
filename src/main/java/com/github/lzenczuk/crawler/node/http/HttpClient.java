@@ -10,5 +10,5 @@ import java.util.concurrent.CompletableFuture;
  * @author lzenczuk 04/04/2016
  */
 public interface HttpClient {
-    CompletableFuture<HttpResponse> getUri(URI uri) throws HttpClientNoResourcesException;
+    CompletableFuture<HttpResponse> getUri(URI uri);
 }

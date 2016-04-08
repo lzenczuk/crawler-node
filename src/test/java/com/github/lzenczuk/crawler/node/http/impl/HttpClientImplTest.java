@@ -1,6 +1,5 @@
 package com.github.lzenczuk.crawler.node.http.impl;
 
-import com.github.lzenczuk.crawler.node.http.HttpClientNoResourcesException;
 import com.github.lzenczuk.crawler.node.http.model.HttpResponse;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
@@ -59,7 +57,7 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldHaveTheSameAmountOfExpectedAndActiveRequestsAfterCreation() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldHaveTheSameAmountOfExpectedAndActiveRequestsAfterCreation() throws URISyntaxException, InterruptedException {
 
         final HttpClientImpl httpClient = new HttpClientImpl(3);
 
@@ -69,7 +67,7 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldIncreaseNumberOfActiveRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldIncreaseNumberOfActiveRequests() throws URISyntaxException, InterruptedException {
 
         final HttpClientImpl httpClient = new HttpClientImpl(3);
 
@@ -95,7 +93,7 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldDecrementNumberOfActiveRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldDecrementNumberOfActiveRequests() throws URISyntaxException, InterruptedException {
 
         final HttpClientImpl httpClient = new HttpClientImpl(5);
 
@@ -125,7 +123,7 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldGetUrl() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldGetUrl() throws URISyntaxException, InterruptedException {
         final HttpClientImpl httpClient = new HttpClientImpl();
 
         final CountDownLatch countDownLatch = new CountDownLatch(1);
@@ -147,7 +145,7 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldAcceptGetUrlRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldAcceptGetUrlRequests() throws URISyntaxException, InterruptedException {
         final int maxActiveRequests = 2;
 
         final HttpClientImpl httpClient = new HttpClientImpl(maxActiveRequests);

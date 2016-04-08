@@ -1,10 +1,10 @@
 package com.github.lzenczuk.crawler.node.service.impl;
 
 import com.github.lzenczuk.crawler.node.http.HttpClient;
-import com.github.lzenczuk.crawler.node.http.HttpClientNoResourcesException;
 import com.github.lzenczuk.crawler.node.http.model.HttpResponse;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlRequestDTO;
 import com.github.lzenczuk.crawler.node.input.web.dto.UrlResponseDTO;
+import com.github.lzenczuk.crawler.node.mq.log.LogNotificationPublisher;
 import com.github.lzenczuk.crawler.node.storage.Storage;
 import com.github.lzenczuk.crawler.node.storage.StorageCreationException;
 import com.github.lzenczuk.crawler.node.storage.StorageFactory;
@@ -35,7 +35,7 @@ public class UrlRequestServiceImplTest {
     private InputStream inputStreamMock;
 
     @Before
-    public void initMocks() throws InterruptedException, StorageCreationException, HttpClientNoResourcesException {
+    public void initMocks() throws InterruptedException, StorageCreationException {
         httpClientMock = mock(HttpClient.class);
         storageFactoryMock = mock(StorageFactory.class);
         storageMock = mock(Storage.class);
@@ -49,12 +49,14 @@ public class UrlRequestServiceImplTest {
     }
 
     @Test
-    public void shouldCallHttpClientToFetchUriAndReleasedIt() throws URISyntaxException, HttpClientNoResourcesException {
+    public void shouldCallHttpClientToFetchUriAndReleasedIt() throws URISyntaxException {
 
         final String urlString = "http://wwww.google.com";
         final URI uri = new URI(urlString);
 
-        final UrlRequestServiceImpl requestService = new UrlRequestServiceImpl(httpClientMock, storageFactoryMock);
+        final NotificationServiceImpl notificationService = new NotificationServiceImpl(new LogNotificationPublisher());
+
+        final UrlRequestServiceImpl requestService = new UrlRequestServiceImpl(httpClientMock, storageFactoryMock, notificationService);
 
         requestService.process(new UrlRequestDTO(urlString, "DEV_NULL", null));
 
@@ -63,9 +65,11 @@ public class UrlRequestServiceImplTest {
     }
 
     @Test
-    public void shouldRejectInvalidRequest() throws URISyntaxException, InterruptedException, StorageCreationException, ExecutionException, HttpClientNoResourcesException {
+    public void shouldRejectInvalidRequest() throws URISyntaxException, InterruptedException, StorageCreationException, ExecutionException {
 
-        final UrlRequestServiceImpl requestService = new UrlRequestServiceImpl(httpClientMock, storageFactoryMock);
+        final NotificationServiceImpl notificationService = new NotificationServiceImpl(new LogNotificationPublisher());
+
+        final UrlRequestServiceImpl requestService = new UrlRequestServiceImpl(httpClientMock, storageFactoryMock, notificationService);
 
         CompletableFuture<UrlResponseDTO> urlResponseDTO = requestService.process(null);
         assertNotNull(urlResponseDTO.get().getErrorMessage());
