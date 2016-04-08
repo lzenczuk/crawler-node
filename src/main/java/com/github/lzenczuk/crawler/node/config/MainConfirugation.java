@@ -2,6 +2,7 @@ package com.github.lzenczuk.crawler.node.config;
 
 import com.github.lzenczuk.crawler.node.http.HttpClient;
 import com.github.lzenczuk.crawler.node.http.impl.HttpClientImpl;
+import com.github.lzenczuk.crawler.node.input.mq.UrlRequestRabbitConsumer;
 import com.github.lzenczuk.crawler.node.mq.NotificationPublisher;
 import com.github.lzenczuk.crawler.node.mq.log.LogNotificationPublisher;
 import com.github.lzenczuk.crawler.node.mq.rabbit.RabbitNotificationPublisher;
@@ -10,6 +11,7 @@ import com.github.lzenczuk.crawler.node.service.UrlRequestService;
 import com.github.lzenczuk.crawler.node.service.impl.NotificationServiceImpl;
 import com.github.lzenczuk.crawler.node.service.impl.UrlRequestServiceImpl;
 import com.github.lzenczuk.crawler.node.storage.StorageFactory;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,7 +23,7 @@ import java.util.concurrent.TimeoutException;
  */
 
 @Configuration
-public class MainConfirugation {
+public class MainConfirugation{
 
     @Bean
     public HttpClient httpClient() throws InterruptedException {
@@ -50,4 +52,8 @@ public class MainConfirugation {
         return new UrlRequestServiceImpl(httpClient, storageFactory, notificationService);
     }
 
+    @Bean
+    public UrlRequestRabbitConsumer urlRequestRabbitConsumer(UrlRequestService urlRequestService) throws IOException, TimeoutException {
+        return new UrlRequestRabbitConsumer("localhost", "crawler-url-requests-q", urlRequestService);
+    }
 }
