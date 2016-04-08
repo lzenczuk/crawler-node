@@ -99,7 +99,7 @@ public class HttpClientImpl implements HttpClient {
     private void releaseActiveRequest(Integer activeRequestId) {
         try {
             if(decrementNumberOfActiveRequestIfNecessary()){
-                logger.info("Decrement number of active request skipping request: "+activeRequestId);
+                logger.info("Remove active request "+activeRequestId+" by not adding in back to queue.");
             }else{
                 requestQueue.put(activeRequestId);
             }
@@ -117,12 +117,12 @@ public class HttpClientImpl implements HttpClient {
     }
 
     public int getExpectedNumberOfActiveRequests(){
-        return numberOfActiveRequests.get();
+        return expectedNumberOfActiveRequests.get();
     }
 
-    public synchronized void updateNumberOfActiveRequests(int defaultActiveRequest) throws InterruptedException {
+    public synchronized void updateNumberOfActiveRequests(int numberActiveRequest) throws InterruptedException {
 
-        expectedNumberOfActiveRequests.set(defaultActiveRequest);
+        expectedNumberOfActiveRequests.set(numberActiveRequest);
 
         int noar = numberOfActiveRequests.get();
         int enoar = expectedNumberOfActiveRequests.get();
@@ -132,8 +132,10 @@ public class HttpClientImpl implements HttpClient {
         }
 
         for(int q = noar;q<enoar;q++){
-            requestQueue.put(activeRequestIdGenerator.getAndIncrement());
+            final int id = activeRequestIdGenerator.getAndIncrement();
+            requestQueue.put(id);
             numberOfActiveRequests.incrementAndGet();
+            logger.info("Add new active request: "+id);
         }
     }
 

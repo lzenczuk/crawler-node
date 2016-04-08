@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,6 +59,72 @@ public class HttpClientImplTest {
     }
 
     @Test
+    public void shouldHaveTheSameAmountOfExpectedAndActiveRequestsAfterCreation() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+
+        final HttpClientImpl httpClient = new HttpClientImpl(3);
+
+        assertEquals(3, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfWaitingActiveRequests());
+    }
+
+    @Test
+    public void shouldIncreaseNumberOfActiveRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+
+        final HttpClientImpl httpClient = new HttpClientImpl(3);
+
+        assertEquals(3, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfWaitingActiveRequests());
+
+        httpClient.updateNumberOfActiveRequests(5);
+
+        final CountDownLatch countDownLatch = new CountDownLatch(9);
+
+        final List<Boolean> successfulRequest = Collections.synchronizedList(new ArrayList<>());
+
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+
+        countDownLatch.await(2000, TimeUnit.MILLISECONDS);
+
+        assertEquals(5, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfWaitingActiveRequests());
+    }
+
+    @Test
+    public void shouldDecrementNumberOfActiveRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+
+        final HttpClientImpl httpClient = new HttpClientImpl(5);
+
+        assertEquals(5, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfWaitingActiveRequests());
+
+        httpClient.updateNumberOfActiveRequests(3);
+
+        assertEquals(3, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfActiveRequests());
+        assertEquals(5, httpClient.getNumberOfWaitingActiveRequests());
+
+        final CountDownLatch countDownLatch = new CountDownLatch(9);
+
+        final List<Boolean> successfulRequest = Collections.synchronizedList(new ArrayList<>());
+
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
+
+        countDownLatch.await(2000, TimeUnit.MILLISECONDS);
+
+        assertEquals(3, httpClient.getExpectedNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfActiveRequests());
+        assertEquals(3, httpClient.getNumberOfWaitingActiveRequests());
+    }
+
+    @Test
     public void shouldGetUrl() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
         final HttpClientImpl httpClient = new HttpClientImpl();
 
@@ -80,98 +147,39 @@ public class HttpClientImplTest {
     }
 
     @Test
-    public void shouldAcceptAndRejectGetUrlRequest() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
+    public void shouldAcceptGetUrlRequests() throws URISyntaxException, HttpClientNoResourcesException, InterruptedException {
         final int maxActiveRequests = 2;
 
         final HttpClientImpl httpClient = new HttpClientImpl(maxActiveRequests);
-
-        logger.info("Number of expected active request: "+httpClient.getExpectedNumberOfActiveRequests());
-        logger.info("Number of active request: "+httpClient.getNumberOfActiveRequests());
-        logger.info("Number of waiting active request: "+httpClient.getNumberOfWaitingActiveRequests());
 
         final CountDownLatch countDownLatch = new CountDownLatch(9);
 
         final List<Boolean> successfulRequest = Collections.synchronizedList(new ArrayList<>());
 
         getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
         getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
         getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
         getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
         getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
-        getOkWith500Delay(httpClient, countDownLatch, successfulRequest);
-        logger.info("Return from getOkWith500Delay");
 
-        countDownLatch.await(200, TimeUnit.MILLISECONDS);
+        countDownLatch.await(2000, TimeUnit.MILLISECONDS);
 
         LinkedList<Boolean> expectedResult = new LinkedList<>();
-        for(int x=0;x<3;x++) {
-            expectedResult.add(false);
-            expectedResult.add(true);
+        for(int x=0;x<5;x++) {
             expectedResult.add(true);
         }
-
-        logger.info("Expected: "+expectedResult);
-        logger.info("Result: "+successfulRequest);
 
         assertArrayEquals(expectedResult.toArray(),successfulRequest.toArray());
 
     }
 
     private void getOkWith500Delay(HttpClientImpl httpClient, CountDownLatch countDownLatch, List<Boolean> successfulRequest) throws URISyntaxException {
-        httpClient.getUri(new URI("http://localhost:" + HTTP_MOCK_SERVER_PROXY + OK_WITH_500_DELAY)).thenAcceptAsync(httpResponse -> {
-            logger.info("Http response: "+httpResponse.getStatusCode());
+        final CompletableFuture<HttpResponse> urifuture = httpClient.getUri(new URI("http://localhost:" + HTTP_MOCK_SERVER_PROXY + OK_WITH_500_DELAY));
+
+        urifuture.thenAcceptAsync(httpResponse -> {
             successfulRequest.add(true);
             countDownLatch.countDown();
         });
-
-        logger.info("Leaving from getOkWith500Delay");
     }
 
     @AfterClass
